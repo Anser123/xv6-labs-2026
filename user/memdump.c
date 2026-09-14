@@ -60,6 +60,88 @@ main(int argc, char *argv[])
 void
 memdump(char *fmt, char *data, int len)
 {
-  // Your code here.  `data` holds `len` valid bytes.
+  int pos = 0;
 
+  for(int f = 0; fmt[f] != '\0'; f++){
+    char type = fmt[f];
+
+    if(type == 'i'){
+      if(pos + 4 > len){
+        printf("memdump: not enough data for '%c'\n", type);
+        return;
+      }
+
+      int value;
+      memmove(&value, data + pos, 4);
+      printf("%d\n", value);
+
+      pos += 4;
+    }
+
+    else if(type == 'p'){
+      if(pos + 8 > len){
+        printf("memdump: not enough data for '%c'\n", type);
+        return;
+      }
+
+      uint64 value;
+      memmove(&value, data + pos, 8);
+      printf("%lx\n", value);
+
+      pos += 8;
+    }
+
+    else if(type == 'h'){
+      if(pos + 2 > len){
+        printf("memdump: not enough data for '%c'\n", type);
+        return;
+      }
+
+      short value;
+      memmove(&value, data + pos, 2);
+      printf("%d\n", value);
+
+      pos += 2;
+    }
+
+    else if(type == 'c'){
+      if(pos + 1 > len){
+        printf("memdump: not enough data for '%c'\n", type);
+        return;
+      }
+
+      printf("%c\n", data[pos]);
+      pos++;
+    }
+
+    else if(type == 's'){
+      if(pos + 8 > len){
+        printf("memdump: not enough data for '%c'\n", type);
+        return;
+      }
+
+      char *str;
+      memmove(&str, data + pos, 8);
+      printf("%s\n", str);
+
+      pos += 8;
+    }
+
+    else if(type == 'S'){
+      if(pos >= len){
+        printf("memdump: not enough data for '%c'\n", type);
+        return;
+      }
+
+      while(pos < len && data[pos] != '\0'){
+        printf("%c", data[pos]);
+        pos++;
+      }
+
+      printf("\n");
+
+      if(pos < len)
+        pos++;
+    }
+  }
 }
