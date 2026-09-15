@@ -1,6 +1,7 @@
 // Shell.
 
 #include "kernel/types.h"
+#include "kernel/stat.h"
 #include "user/user.h"
 #include "kernel/fcntl.h"
 
@@ -134,11 +135,17 @@ runcmd(struct cmd *cmd)
 int
 getcmd(char *buf, int nbuf)
 {
-  write(2, "$ ", 2);
+  struct stat st;
+
+  if(fstat(0, &st) >= 0 && st.type == T_DEVICE)
+    write(2, "$ ", 2);
+
   memset(buf, 0, nbuf);
   gets(buf, nbuf);
-  if (buf[0] == 0) // EOF
+
+  if(buf[0] == 0)
     return -1;
+
   return 0;
 }
 
@@ -164,15 +171,20 @@ main(void)
     if (*cmd == '\n') // is a blank command
       continue;
     if (cmd[0] == 'c' && cmd[1] == 'd' && cmd[2] == ' ') {
-      // Chdir must be called by the parent, not the child.
-      cmd[strlen(cmd) - 1] = 0; // chop \n
-      if (chdir(cmd + 3) < 0)
-        fprintf(2, "cannot cd %s\n", cmd + 3);
-    } else {
-      if (fork1() == 0)
-        runcmd(parsecmd(cmd));
-      wait(0);
-    }
+
+  // Chdir must be called by the parent, not the child.
+  cmd[strlen(cmd) - 1] = 0; // chop \n
+
+  if (chdir(cmd + 3) < 0)
+    fprintf(2, "cannot cd %s\n", cmd + 3);
+
+} else {
+
+  if (fork1() == 0)
+    runcmd(parsecmd(cmd));
+
+  wait(0);
+}
   }
   exit(0);
 }
