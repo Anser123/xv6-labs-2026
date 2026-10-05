@@ -107,10 +107,50 @@ sys_vmprint(void)
 #endif
 
 #ifdef LAB_PGTBL
-int
+uint64
 sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
+  uint64 start;
+  int npages;
+  uint64 user_mask;
+
+  argaddr(0, &start);
+  argint(1, &npages);
+  argaddr(2, &user_mask);
+
+  // Reject unreasonable values, but allow the test's 256 pages.
+  if(npages <= 0 || npages > 4096)
+    return -1;
+
+  int nbytes = (npages + 7) / 8;
+
+  // Maximum 4096 pages -> 512-byte mask.
+  char mask[512];
+  memset(mask, 0, sizeof(mask));
+
+  struct proc *p = myproc();
+
+  for(int i = 0; i < npages; i++){
+    uint64 va = start + (uint64)i * PGSIZE;
+
+    pte_t *pte = walk(p->pagetable, va, 0);
+
+    if(pte == 0 || (*pte & PTE_V) == 0)
+      return -1;
+
+    if(*pte & PTE_A){
+      mask[i / 8] |= (1 << (i % 8));
+
+      // Clear access bit so next pgaccess() detects
+      // only accesses since this call.
+      *pte &= ~PTE_A;
+    }
+  }
+
+  if(copyout(p->pagetable, p->sz, user_mask,
+             mask, nbytes) < 0)
+    return -1;
+
   return 0;
 }
 #endif

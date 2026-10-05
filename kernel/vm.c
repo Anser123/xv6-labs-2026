@@ -148,23 +148,114 @@ walkaddr(pagetable_t pagetable, uint64 va)
 
 
 #if defined(LAB_PGTBL) || defined(SOL_MMAP) || defined(SOL_COW)
+
+static void
+vmprintwalk(pagetable_t pagetable, int level, uint64 va)
+{
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+
+    if(pte & PTE_V){
+      uint64 nva = va | ((uint64)i << (12 + 9 * level));
+
+      for(int j = 0; j < 3 - level; j++)
+        printk(" ..");
+
+      printk("%p: pte %p pa %p ",
+             (void *)nva,
+             (void *)pte,
+             (void *)PTE2PA(pte));
+
+      if(pte & PTE_R) printk("R");
+      if(pte & PTE_W) printk("W");
+      if(pte & PTE_X) printk("X");
+      if(pte & PTE_U) printk("U");
+      printk("\n");
+
+      if((pte & (PTE_R | PTE_W | PTE_X)) == 0)
+        vmprintwalk((pagetable_t)PTE2PA(pte), level - 1, nva);
+    }
+  }
+}
+
 void
 vmprint(pagetable_t pagetable)
 {
-  // your code here
+  printk("page table %p\n", pagetable);
+  vmprintwalk(pagetable, 2, 0);
 }
+
 #endif
 
 
 // add a mapping to the kernel page table.
 // only used when booting.
 // does not flush TLB or enable paging.
+
+static int
+kvmmappages(pagetable_t pagetable, uint64 va, uint64 size,
+            uint64 pa, int perm)
+{
+  uint64 end = va + size;
+
+  while(va < end){
+    if((va % (2L * 1024 * 1024)) == 0 &&
+       (pa % (2L * 1024 * 1024)) == 0 &&
+       end - va >= (2L * 1024 * 1024)){
+
+      int px2 = PX(2, va);
+      int px1 = PX(1, va);
+
+      pte_t *pte2 = &pagetable[px2];
+      pagetable_t level1;
+
+      if(*pte2 & PTE_V){
+        if(*pte2 & (PTE_R | PTE_W | PTE_X))
+          panic("kvmmappages");
+        level1 = (pagetable_t)PTE2PA(*pte2);
+      } else {
+        level1 = (pagetable_t)kalloc();
+        if(level1 == 0)
+          return -1;
+
+        memset(level1, 0, PGSIZE);
+        *pte2 = PA2PTE(level1) | PTE_V;
+      }
+
+      pte_t *pte1 = &level1[px1];
+
+      if(*pte1 & PTE_V)
+        panic("kvmmappages: remap");
+
+      *pte1 = PA2PTE(pa) | perm | PTE_V;
+
+      va += 2L * 1024 * 1024;
+      pa += 2L * 1024 * 1024;
+    } else {
+      if(mappages(pagetable, va, PGSIZE, pa, perm) != 0)
+        return -1;
+
+      va += PGSIZE;
+      pa += PGSIZE;
+    }
+  }
+
+  return 0;
+}
+
 void
 kvmmap(pagetable_t kpgtbl, uint64 va, uint64 pa, uint64 sz, int perm)
 {
-  if (mappages(kpgtbl, va, sz, pa, perm) != 0)
+  if (kvmmappages(kpgtbl, va, sz, pa, perm) != 0)
     panic("kvmmap");
 }
+
+// Create PTEs for virtual addresses starting at va that refer to
+// physical addresses starting at pa.
+
+// add a mapping to the kernel page table.
+// only used when booting.
+// does not flush TLB or enable paging.
 
 // Create PTEs for virtual addresses starting at va that refer to
 // physical addresses starting at pa.

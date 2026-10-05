@@ -1,0 +1,74 @@
+1. print_pgtbl page table entries
+
+VA 0x0:
+This is the user program text/code page. It is readable, executable,
+and accessible from user mode (R, X, U).
+
+VA 0x1000:
+This is a user data page. It is readable and writable and accessible
+from user mode (R, W, U).
+
+VA 0x2000:
+This is the guard page for the user stack. It is readable and writable
+by the kernel but does not have the U bit, so user mode cannot access it.
+
+VA 0x3000:
+This is the user stack page. It is readable and writable and accessible
+from user mode (R, W, U).
+
+The unmapped addresses have PTE value 0 and therefore do not refer to
+physical pages.
+
+The high-address kernel-only mappings include the USYSCALL, trapframe,
+and trampoline pages. USYSCALL is user-readable, the trapframe is
+kernel-readable/writable, and the trampoline is readable/executable.
+
+The permission bits mean:
+R = readable
+W = writable
+X = executable
+U = accessible from user mode
+V = valid page table entry
+
+
+2. vmprint leaf pages
+
+The leaf entries printed by vmprint correspond to actual mapped pages.
+
+0x0 is the program text page and has RXU permissions.
+0x1000 is a user data page and has RWU permissions.
+0x2000 is the stack guard page and has RW permissions without U.
+0x3000 is the user stack page and has RWU permissions.
+
+At the top of the address space, USYSCALL is readable by user mode,
+the trapframe is kernel read/write, and the trampoline is kernel
+read/execute.
+
+The non-leaf entries printed by vmprint point to lower-level page
+tables rather than directly to physical data pages. These entries have
+the valid bit set but do not have R, W, or X permissions.
+
+These mappings agree with the PTEs displayed by print_pgtbl.
+
+
+3. Other system calls that could be made faster
+
+Other simple system calls that only return frequently-read kernel
+information could use a shared read-only page in a similar way.
+For example, a getppid-style call could store the parent PID in the
+shared page. A call such as uptime could also potentially expose a
+kernel-maintained counter through a read-only shared page.
+
+This avoids entering the kernel through a system call each time the
+user program only needs to read the value.
+
+
+4. Superpages
+
+A 2 MB superpage maps the same amount of memory as 512 normal 4 KB
+pages. Instead of using 512 bottom-level PTEs for that 2 MB region,
+the page table can use one higher-level leaf PTE.
+
+Therefore superpages reduce the number of PTEs and bottom-level page
+table pages required for large aligned kernel mappings. They also
+reduce page-table traversal overhead and can reduce TLB pressure.
