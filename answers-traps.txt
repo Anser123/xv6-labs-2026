@@ -1,0 +1,16 @@
+1. Function arguments are passed in registers a0 through a7. In main's call to printf, a0 holds the format string pointer, a1 holds 12 (the result of f(8) + 1), and a2 holds 13.
+
+2. There is no explicit call to f or g in main's assembly because the compiler has inlined both functions. Since g(x) returns x + 3, f(8) evaluates to 11, and f(8) + 1 evaluates to 12. The assembly loads 12 directly into a1.
+
+3. The function printf is located at address 0x766, as shown by the instruction at address 0x38: jal 766 <printf>.
+
+4. Immediately after the jal instruction at address 0x38 calls printf, the ra register contains 0x3c, the address of the next instruction.
+
+5. The output of the code is:
+He110 World
+
+The integer 57616 is hexadecimal 0xe110, so %x prints e110. On a little-endian RISC-V machine, i = 0x00646c72 is stored in memory as the bytes 0x72, 0x6c, 0x64, 0x00, which represent the characters r, l, d, and the null terminator. Therefore, %s prints rld after "Wo", producing "He110 World".
+
+On a big-endian machine, i should be set to 0x726c6400 to store the bytes r, l, d, and the null terminator in that order. The value 57616 does not need to change because %x formats the integer value, not its individual bytes.
+
+6. In printf("x=%d y=%d", 3), x is printed as 3. The value printed after y= is unpredictable because the format string requests two integer arguments, but only one argument is provided. printf attempts to read a second argument that was never passed, resulting in an undefined value.

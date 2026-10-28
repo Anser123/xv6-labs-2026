@@ -135,6 +135,23 @@ printk(char *fmt, ...)
 }
 
 void
+backtrace(void)
+{
+  uint64 fp = r_fp();
+  uint64 stack_page = PGROUNDDOWN(fp);
+
+  printk("backtrace:\n");
+  while (fp >= stack_page + 16 && fp < stack_page + PGSIZE) {
+    uint64 ra = *(uint64 *)(fp - 8);
+    uint64 next = *(uint64 *)(fp - 16);
+    printk("%p\n", (void *)ra);
+    if (next <= fp || PGROUNDDOWN(next) != stack_page)
+      break;
+    fp = next;
+  }
+}
+
+void
 panic(char *s)
 {
   panicking = 1;
